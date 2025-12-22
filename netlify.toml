@@ -1,0 +1,28 @@
+[build]
+functions = "netlify/functions"
+
+[env]
+CLOUDINARY_API_CLIENT_NAME = 'didikwl4i'
+CLOUDINARY_API_KEY = '666335184711466'
+CLOUDINARY_API_SECRET = 'JXiP1cUSE0ocB8IQcQd1tpU8mTw'
+CLOUDINARY_URL = 'cloudinary://666335184711466:JXiP1cUSE0ocB8IQcQd1tpU8mTw@didikwl4i'
+JWT_EXPIRATION_NUM = '90000000'
+JWT_EXPIRES_IN = '900000000'
+JWT_SECRET = 'mysuperverysecretsecretverysecretkey'
+ONLINE_DATABASE_URL = 'mongodb+srv://kubwimanaaped:F153i9tlyEK9NZLx@cluster0.kphp9lf.mongodb.net/womendoctors?retryWrites=true&w=majority'
+PORT = '8080'
+RESET_PASSWORD_EMAIL = 'medicaldoctorsforchoice@gmail.com'
+RESET_PASSWORD_PASSWORD = 'bxdkqthxcufpbihk'
+frontendURL = 'http://localhost:5173'
+serverURL = 'http://0.0.0.0:8080'
+
+[functions]
+external_node_modules = ["mongoose", "cloudinary", "bcryptjs"]
+node_bundler = "esbuild"
+
+
+[[redirects]]
+from = "/*"
+to = "/.netlify/functions/index"
+status = 200
+force = true

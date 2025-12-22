@@ -17,29 +17,37 @@ const partnerRouter = require("./routes/partnerRouter");
 const teamMemberRouter = require("./routes/teamMemberRouter");
 const ourTeamPageRouter = require("./routes/ourTeamPageRouter");
 const pagesRouter = require("./routes/pagesRouter");
+
 const app = express();
 
 app.use(morgan("dev"));
 app.use(express.json({ limit: "300mb" }));
 app.use(express.urlencoded({ limit: "300mb" }));
-app.use(cors({ origin: "*" }));
-app.options("*", cors());
 
-app.use("/", siteInfoRouter);
-app.use("/aboutus", aboutusRouter);
-app.use("/contactus", contactusRouter);
-app.use("/compaign", compaignRouter);
-app.use("/training", trainingRouter);
-app.use("/advocacy", advocacyRouter);
-app.use("/ourteam", ourTeamPageRouter);
-app.use("/partners", partnerRouter);
-app.use("/teammembers", teamMemberRouter);
-app.use("/digitalhealth", digitalInfoRouter);
+// Configure CORS properly
+const corsOptions = {
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+};
 
-app.use("/admin", authRouter);
-app.use("/pages", pagesRouter);
-app.use("/blogs", blogRouter);
-app.use("/events", eventsRouter);
-app.use("/news", newsRouter);
+app.use(cors(corsOptions));
+
+app.use("/api/v1/", siteInfoRouter);
+app.use("/api/v1/aboutus", aboutusRouter);
+app.use("/api/v1/contactus", contactusRouter);
+app.use("/api/v1/compaign", compaignRouter);
+app.use("/api/v1/training", trainingRouter);
+app.use("/api/v1/advocacy", advocacyRouter);
+app.use("/api/v1/ourteam", ourTeamPageRouter);
+app.use("/api/v1/partners", partnerRouter);
+app.use("/api/v1/teammembers", teamMemberRouter);
+app.use("/api/v1/digitalhealth", digitalInfoRouter);
+
+app.use("/api/v1/admin", authRouter);
+app.use("/api/v1/pages", pagesRouter);
+app.use("/api/v1/blogs", blogRouter);
+app.use("/api/v1/events", eventsRouter);
+app.use("/api/v1/news", newsRouter);
 
 module.exports = app;
