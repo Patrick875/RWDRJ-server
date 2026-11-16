@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 
 const authRouter = require("./routes/authRouter");
 const blogRouter = require("./routes/blogRouter");
@@ -25,21 +26,30 @@ app.use(express.urlencoded({ limit: "300mb" }));
 app.use(cors({ origin: "*" }));
 app.options("*", cors());
 
-app.use("/", siteInfoRouter);
-app.use("/aboutus", aboutusRouter);
-app.use("/contactus", contactusRouter);
-app.use("/compaign", compaignRouter);
-app.use("/training", trainingRouter);
-app.use("/advocacy", advocacyRouter);
-app.use("/ourteam", ourTeamPageRouter);
-app.use("/partners", partnerRouter);
-app.use("/teammembers", teamMemberRouter);
-app.use("/digitalhealth", digitalInfoRouter);
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use("/admin", authRouter);
-app.use("/pages", pagesRouter);
-app.use("/blogs", blogRouter);
-app.use("/events", eventsRouter);
-app.use("/news", newsRouter);
+// Handle other routes by serving the index.html
+// app.get("*", (req, res) => {
+// 	res.sendFile(path.join(__dirname, "public", "index.html"));
+// });
+
+//api routes
+
+app.use("/api/", siteInfoRouter);
+app.use("/api/aboutus", aboutusRouter);
+app.use("/api/contactus", contactusRouter);
+app.use("/api/compaign", compaignRouter);
+app.use("/api/training", trainingRouter);
+app.use("/api/advocacy", advocacyRouter);
+app.use("/api/ourteam", ourTeamPageRouter);
+app.use("/api/partners", partnerRouter);
+app.use("/api/teammembers", teamMemberRouter);
+app.use("/api/digitalhealth", digitalInfoRouter);
+
+app.use("/api/admin", authRouter);
+app.use("/api/pages", pagesRouter);
+app.use("/api/blogs", blogRouter);
+app.use("/api/events", eventsRouter);
+app.use("/api/news", newsRouter);
 
 module.exports = app;
