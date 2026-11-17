@@ -1,16 +1,23 @@
 const AuditLog = require("../models/auditLog");
+const { clientIp, clientLocation } = require("../utils/clientInfo");
 
-const recordAudit = async ({ req, action, resource, resourceId, metadata = {} }) => {
+// `actor` overrides req.user (e.g. at login, before req.user exists).
+const recordAudit = async ({ req, action, resource, resourceId, metadata = {}, actor }) => {
+	const who = actor || req.user;
 	try {
 		await AuditLog.create({
-			actor: req.user?._id,
-			actorEmail: req.user?.email,
+			actor: who?._id,
+			actorEmail: who?.email,
 			action,
 			resource,
 			resourceId: resourceId ? String(resourceId) : undefined,
 			metadata,
-			ipAddress: req.ip,
+			ipAddress: clientIp(req),
+			location: clientLocation(req),
 			userAgent: req.get("user-agent"),
+			method: req.method,
+			path: req.originalUrl?.split("?")[0],
+			requestId: req.requestId,
 		});
 	} catch (error) {
 		console.error("audit_log_write_failed", { message: error.message, action, resource });

@@ -204,6 +204,13 @@ exports.updateSettings = asyncHandler(async (req, res) => {
 
 exports.getAuditLogs = asyncHandler(async (req, res) => {
 	const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
-	const logs = await require("../models/auditLog").find().sort({ createdAt: -1 }).limit(limit).lean();
-	res.status(200).json({ status: "success", data: logs, count: logs.length });
+	const filter = {};
+	if (req.query.action) filter.action = String(req.query.action);
+	if (req.query.actor) filter.actorEmail = { $regex: String(req.query.actor).slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+	const before = req.query.before ? new Date(String(req.query.before)) : null;
+	if (before && !Number.isNaN(before.getTime())) filter.createdAt = { $lt: before };
+	const logs = await require("../models/auditLog").find(filter).sort({ createdAt: -1 }).limit(limit + 1).lean();
+	const hasMore = logs.length > limit;
+	const page = hasMore ? logs.slice(0, limit) : logs;
+	res.status(200).json({ status: "success", data: page, count: page.length, nextCursor: hasMore ? page[page.length - 1].createdAt : null });
 });
