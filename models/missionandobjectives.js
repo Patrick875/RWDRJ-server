@@ -13,6 +13,9 @@ const missionAndObjectivesSchema = mongoose.Schema({
 	objectives: [{ type: String, trim: true }],
 });
 
-const MissionAndObjectives = new mongoose.model(missionAndObjectivesSchema);
+const MissionAndObjectives = mongoose.model(
+	"MissionAndObjectives",
+	missionAndObjectivesSchema
+);
 
 module.exports = MissionAndObjectives;

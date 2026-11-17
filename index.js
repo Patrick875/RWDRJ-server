@@ -1,26 +1,25 @@
-const mongoose = require("mongoose");
+const path = require("path");
 const dotenv = require("dotenv");
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 const cloudinary = require("cloudinary").v2;
+const app = require("./app");
+const { connectDatabase } = require("./config/database");
 
 cloudinary.config({
 	api_key: process.env.CLOUDINARY_API_KEY,
 	api_secret: process.env.CLOUDINARY_API_SECRET,
 	cloud_name: process.env.CLOUDINARY_API_CLIENT_NAME,
 });
-const app = require("./app");
 
-const PORT = process.env.PORT || 5000;
-const DB = process.env.ONLINE_DATABASE_URL;
+const PORT = Number(process.env.PORT || 8080);
 
-mongoose
-	.connect(DB)
+connectDatabase()
 	.then(() => {
 		console.log("DB connection successful");
-		app.listen(PORT, () => {
-			console.log(`App running on port ${PORT}`);
-		});
+		app.listen(PORT, "0.0.0.0", () => console.log(`App running on port ${PORT}`));
 	})
-	.catch((err) => {
-		console.log("err", err);
+	.catch((error) => {
+		console.error("Database connection failed", { message: error.message });
+		process.exitCode = 1;
 	});
