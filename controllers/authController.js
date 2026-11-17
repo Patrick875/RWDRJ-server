@@ -59,12 +59,20 @@ exports.login = asyncHandler(async (req, res) => {
     user.status !== "active" ||
     !(await bcrypt.compare(password, user.password))
   ) {
+    await recordAudit({
+      req,
+      action: "login_failed",
+      resource: "session",
+      actor: user || { email },
+      metadata: { reason: !user ? "unknown_email" : user.status !== "active" ? "inactive_account" : "wrong_password" },
+    });
     return res
       .status(401)
       .json({ status: "fail", message: "Incorrect email or password" });
   }
   user.lastLoginAt = new Date();
   await user.save({ validateBeforeSave: false });
+  await recordAudit({ req, action: "login", resource: "session", actor: user });
   return sendAuthResponse(res, user);
 });
 

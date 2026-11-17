@@ -78,11 +78,15 @@ app.use(
   }),
 );
 
+const { clientIp } = require("./utils/clientInfo");
+const clientKey = (req) => clientIp(req) || "unknown";
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 200000,
   standardHeaders: "draft-8",
   legacyHeaders: false,
+  keyGenerator: clientKey,
   message: { status: "fail", message: "Too many authentication attempts" },
 });
 
@@ -131,6 +135,7 @@ const loginLimiter = rateLimit({
   limit: Number(process.env.LOGIN_RATE_LIMIT || 30),
   standardHeaders: "draft-8",
   legacyHeaders: false,
+  keyGenerator: clientKey,
   message: { status: "fail", message: "Too many login attempts, try again later" },
 });
 app.use("/api/admin/login", loginLimiter);
