@@ -26,15 +26,18 @@ const normalizeSections = (sections = []) =>
 		? sections.map((section, index) => ({
 				id: section.id || crypto.randomUUID(),
 				type: String(section.type || "rich_text").trim(),
+				version: Math.max(Number(section.version) || 1, 1),
 				label: section.label ? String(section.label).trim() : undefined,
 				order: Number.isFinite(Number(section.order)) ? Number(section.order) : index,
 				visible: section.visible !== false,
 				data: section.data && typeof section.data === "object" ? section.data : {},
+				style: section.style && typeof section.style === "object" ? section.style : {},
+				responsive: section.responsive && typeof section.responsive === "object" ? section.responsive : {},
 			}))
 		: [];
 
 exports.getPublicPage = asyncHandler(async (req, res) => {
-	const page = await Page.findOne({ slug: req.params.slug, status: "published" }).lean();
+	const page = await Page.findOne({ $or: [{ slug: req.params.slug }, { routeAliases: req.params.slug }], status: "published" }).lean();
 	if (!page) return res.status(404).json({ status: "fail", message: "Page not found" });
 	res.status(200).json({ status: "success", data: page });
 });
@@ -59,7 +62,7 @@ exports.createPage = asyncHandler(async (req, res) => {
 
 	if (req.body.status === "published" && !publisherRoles.has(req.user.role)) return res.status(403).json({ status: "fail", message: "Publishing permission required" });
 	const page = await Page.create({
-		...pick(req.body, ["title", "excerpt", "coverImage", "seo", "status"]),
+		...pick(req.body, ["title", "template", "excerpt", "coverImage", "seo", "status", "routeAliases", "themeOverrides"]),
 		title,
 		slug,
 		sections: normalizeSections(req.body.sections),
@@ -78,7 +81,7 @@ exports.updatePage = asyncHandler(async (req, res) => {
 	}
 	if (req.body.status === "published" && !publisherRoles.has(req.user.role)) return res.status(403).json({ status: "fail", message: "Publishing permission required" });
 
-	const updates = pick(req.body, ["title", "excerpt", "coverImage", "seo", "status"]);
+	const updates = pick(req.body, ["title", "template", "excerpt", "coverImage", "seo", "status", "routeAliases", "themeOverrides"]);
 	if (req.body.slug !== undefined) updates.slug = slugify(req.body.slug);
 	if (req.body.sections !== undefined) updates.sections = normalizeSections(req.body.sections);
 	Object.assign(page, updates);
@@ -101,6 +104,13 @@ exports.publishPage = asyncHandler(async (req, res) => {
 	res.status(200).json({ status: "success", data: page });
 });
 
+exports.deletePage = asyncHandler(async (req, res) => {
+	const page = await Page.findByIdAndDelete(req.params.id);
+	if (!page) return res.status(404).json({ status: "fail", message: "Page not found" });
+	await recordAudit({ req, action: "delete", resource: "page", resourceId: page._id, metadata: { slug: page.slug } });
+	res.status(200).json({ status: "success", message: "Page removed" });
+});
+
 exports.listEntries = asyncHandler(async (req, res) => {
 	const filter = { status: "published" };
 	if (req.user) {
@@ -113,6 +123,12 @@ exports.listEntries = asyncHandler(async (req, res) => {
 	}
 	const entries = await ContentEntry.find(filter).sort({ date: -1, createdAt: -1 }).lean();
 	res.status(200).json({ status: "success", data: entries, count: entries.length });
+});
+
+exports.getAdminEntry = asyncHandler(async (req, res) => {
+	const entry = await ContentEntry.findById(req.params.id).lean();
+	if (!entry) return res.status(404).json({ status: "fail", message: "Content entry not found" });
+	res.status(200).json({ status: "success", data: entry });
 });
 
 exports.getEntry = asyncHandler(async (req, res) => {
@@ -171,12 +187,12 @@ exports.publishEntry = asyncHandler(async (req, res) => {
 });
 
 exports.getSettings = asyncHandler(async (req, res) => {
-	const settings = await SiteSettings.findOne({ key: "default" }).lean();
+	const settings = await SiteSettings.findOne({ key: "default" }).populate("locations").lean();
 	res.status(200).json({ status: "success", data: settings });
 });
 
 exports.updateSettings = asyncHandler(async (req, res) => {
-	const updates = pick(req.body, ["organizationName", "logo", "tagline", "description", "contacts", "socialLinks", "navigation"]);
+	const updates = pick(req.body, ["organizationName", "logo", "tagline", "description", "contacts", "socialLinks", "navigation", "announcementBar", "header", "footer", "designTokens", "locations"]);
 	const settings = await SiteSettings.findOneAndUpdate(
 		{ key: "default" },
 		{ $set: { ...updates, updatedBy: req.user._id } },

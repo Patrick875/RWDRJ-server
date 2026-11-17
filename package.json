@@ -5,7 +5,16 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "start:dev": "nodemon -L index.js"
+    "start:dev": "nodemon -L index.js",
+    "test": "node --test --test-concurrency=1 \"tests/unit/*.test.js\"",
+    "test:unit": "node --test \"tests/unit/*.test.js\"",
+    "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-rwdrj --only database,auth \"node --test tests/rules/*.test.js\"",
+    "test:all": "firebase emulators:exec --config ../firebase.json --project demo-rwdrj --only database,auth \"node --test --test-concurrency=1 tests/*/*.test.js\"",
+    "emulators": "firebase emulators:start --config ../firebase.json --project demo-rwdrj --only database,auth",
+    "rules:build": "node firebase/buildRules.js",
+    "rules:deploy": "npm run rules:build && firebase deploy --config ../firebase.json --only database",
+    "seed:content": "node scripts/seedContent.js",
+    "create:admin": "node scripts/createAdmin.js"
   },
   "keywords": [
     "CMS",
@@ -17,19 +26,25 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.0.1",
-    "cors": "^2.8.5",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.5.0",
+    "firebase-admin": "^13.10.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.1.1",
     "morgan": "^1.10.0",
+    "multer": "^2.5.0",
     "nodemailer": "^6.9.13",
+    "sanitize-html": "^2.18.2",
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^14.27.0",
     "nodemon": "^3.0.3"
   }
 }

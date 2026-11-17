@@ -19,7 +19,10 @@ const signToken = (user) =>
 const verifyToken = (token) => jwt.verify(token, getJwtSecret());
 
 const sanitizeUser = (user) => {
+	const { effectiveModules } = require("./modules");
 	const value = user.toObject ? user.toObject() : { ...user };
+	value.modules = effectiveModules(value);
+	value.claimsVersion = Number(value.claimsVersion || 0);
 	delete value.password;
 	delete value.resetPasswordToken;
 	delete value.resetPasswordExpiresAt;

@@ -1,6 +1,7 @@
 const MediaAsset = require("../models/mediaAsset");
 const asyncHandler = require("../utils/asyncHandler");
 const { recordAudit } = require("../middleware/audit");
+const cloudinary = require("cloudinary").v2;
 
 exports.list = asyncHandler(async (req, res) => {
 	const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
@@ -24,6 +25,16 @@ exports.create = asyncHandler(async (req, res) => {
 		uploadedBy: req.user._id,
 	});
 	await recordAudit({ req, action: "create", resource: "media_asset", resourceId: asset._id });
+	res.status(201).json({ status: "success", data: asset });
+});
+
+exports.upload = asyncHandler(async (req, res) => {
+	const source = String(req.body.source || "");
+	if (!/^data:(image|video|application\/pdf)\/[a-z0-9.+-]+;base64,/i.test(source)) return res.status(400).json({ status: "fail", message: "source must be a supported base64 data URL" });
+	if (source.length > 8 * 1024 * 1024) return res.status(413).json({ status: "fail", message: "Media file is too large" });
+	const result = await cloudinary.uploader.upload(source, { folder: "rwdrj-cms", resource_type: "auto" });
+	const asset = await MediaAsset.create({ url: result.secure_url, publicId: result.public_id, resourceType: result.resource_type === "raw" ? "raw" : result.resource_type, mimeType: req.body.mimeType, bytes: req.body.bytes, width: result.width, height: result.height, alt: req.body.alt, caption: req.body.caption, uploadedBy: req.user._id });
+	await recordAudit({ req, action: "upload", resource: "media_asset", resourceId: asset._id });
 	res.status(201).json({ status: "success", data: asset });
 });
 

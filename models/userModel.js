@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema(
 			default: "active",
 			index: true,
 		},
+		// CMS modules this user may manage (administrators implicitly get all). See utils/modules.js.
+		modules: { type: [String], default: [] },
+		// Bumped whenever role/modules/status change so clients know to refresh Firebase claims.
+		claimsVersion: { type: Number, default: 0 },
 		emailVerified: { type: Boolean, default: false },
 		lastLoginAt: Date,
 		invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
