@@ -2,7 +2,7 @@ const nodemailer = require("nodemailer");
 
 const config = {
   service: "gmail",
-  host: "smtp.gmail.com",
+  host: process.env.SMTP_HOST,
   port: 587,
   secure: false,
   auth: {
