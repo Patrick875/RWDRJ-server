@@ -7,6 +7,10 @@ const { signToken, sanitizeUser } = require("../utils/auth");
 const { recordAudit } = require("../middleware/audit");
 const { isFirebaseConfigured } = require("../firebase/admin");
 const { mintCustomToken } = require("../services/firebaseClaims");
+const { sendPasswordResetEmail, sendPasswordChangedEmail } = require("../services/mailer");
+
+const RESET_MINUTES = 60;
+const logMailError = (event, error) => console.error(JSON.stringify({ event, code: error.code, message: error.message }));
 
 const normalizeEmail = (value) =>
   String(value || "")
@@ -118,24 +122,23 @@ exports.signup = asyncHandler(async (req, res) => {
 exports.forgotPassword = asyncHandler(async (req, res) => {
   const email = normalizeEmail(req.body.email);
   const user = await User.findOne({ email });
-  if (user) {
+  // Same response whether or not the account exists (no account enumeration).
+  if (user && user.status === "active") {
     const token = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = hashToken(token);
-    user.resetPasswordExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_MINUTES * 60 * 1000);
     await user.save({ validateBeforeSave: false });
-    console.log(
-      JSON.stringify({
-        event: "password_reset_requested",
-        email,
-        hasMailConfig: Boolean(process.env.RESET_PASSWORD_EMAIL),
-      }),
-    );
+    try {
+      await sendPasswordResetEmail({ email: user.email, fullname: user.fullname, token, minutes: RESET_MINUTES });
+    } catch (error) {
+      logMailError("password_reset_email_failed", error);
+    }
     if (process.env.NODE_ENV !== "production")
-      console.log(`Password reset token for development: ${token}`);
+      console.log(`Password reset link for development: /admin/resetpassword/${token}`);
   }
   res.status(200).json({
     status: "success",
-    message: "If the account exists, reset instructions will be sent",
+    message: "If an account exists for that email, a reset link is on its way",
   });
 });
 
@@ -165,7 +168,13 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     action: "reset_password",
     resource: "user",
     resourceId: user._id,
+    actor: user,
   });
+  try {
+    await sendPasswordChangedEmail({ email: user.email, fullname: user.fullname });
+  } catch (error) {
+    logMailError("password_changed_email_failed", error);
+  }
   res
     .status(200)
     .json({ status: "success", message: "Password reset successfully" });
