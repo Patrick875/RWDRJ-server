@@ -1,18 +1,18 @@
 const nodemailer = require("nodemailer");
 
 const config = {
-	service: "gmail",
-	host: "smtp.gmail.com",
-	port: 587,
-	secure: false,
-	auth: {
-		user: process.env.RESET_PASSWORD_EMAIL,
-		pass: process.env.RESET_PASSWORD_PASSWORD,
-	},
+  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.RESET_PASSWORD_EMAIL,
+    pass: process.env.RESET_PASSWORD_PASSWORD,
+  },
 };
 
 const resetTemplate = () => {
-	return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
     <style>
     h1{
@@ -40,9 +40,9 @@ const resetTemplate = () => {
 </html>`;
 };
 const forgotPasswordTemplate = (names, token) => {
-	const frontendURL = process.env.frontendURL;
-	console.log("frontendURL", frontendURL);
-	return `<!DOCTYPE html>
+  const frontendURL = process.env.frontendURL;
+  console.log("frontendURL", frontendURL);
+  return `<!DOCTYPE html>
 <html lang="en">
     <style>
     h1{
@@ -77,7 +77,7 @@ const forgotPasswordTemplate = (names, token) => {
 };
 
 const registerTemplate = (names) => {
-	return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
     <style>
     h1{
@@ -103,28 +103,29 @@ const registerTemplate = (names) => {
 };
 
 const send = (mailData, subject, text) => {
-	const data = {
-		from: process.env.RESET_PASSWORD_EMAIL,
-		to: mailData.userEmail,
-		subject: subject,
-		text: text,
-		html:
-			subject === "Reset Password"
-				? resetTemplate()
-				: subject === "register"
-				? registerTemplate(mailData.userNames)
-				: forgotPasswordTemplate(mailData.userNames, mailData.token),
-	};
+  console.log("config", config);
+  const data = {
+    from: process.env.RESET_PASSWORD_EMAIL,
+    to: mailData.userEmail,
+    subject: subject,
+    text: text,
+    html:
+      subject === "Reset Password"
+        ? resetTemplate()
+        : subject === "register"
+          ? registerTemplate(mailData.userNames)
+          : forgotPasswordTemplate(mailData.userNames, mailData.token),
+  };
 
-	const transporter = nodemailer.createTransport(config);
+  const transporter = nodemailer.createTransport(config);
 
-	transporter.sendMail(data, (err, info) => {
-		if (err) {
-			console.log(err);
-		} else {
-			console.log("Email sent:", info.response);
-		}
-	});
+  transporter.sendMail(data, (err, info) => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log("Email sent:", info.response);
+    }
+  });
 };
 
 module.exports = { send };

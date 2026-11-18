@@ -5,7 +5,21 @@ const UserInvite = require("../models/userInvite");
 const asyncHandler = require("../utils/asyncHandler");
 const { sanitizeUser } = require("../utils/auth");
 const { recordAudit } = require("../middleware/audit");
-const { sendAdminInvite } = require("../utils/sendAdminInvite");
+const { sendInviteEmail, sendPasswordResetEmail, links } = require("../services/mailer");
+
+const INVITE_HOURS = 72;
+const ADMIN_RESET_HOURS = 24;
+
+/** Try to email; never fail the request. Returns { emailSent, emailError }. */
+async function trySend(fn) {
+	try {
+		await fn();
+		return { emailSent: true };
+	} catch (error) {
+		console.error(JSON.stringify({ event: "account_email_failed", code: error.code, message: error.message }));
+		return { emailSent: false, emailError: error.code === "MAIL_NOT_CONFIGURED" ? "Email sending is not set up on the server." : "The email could not be sent." };
+	}
+}
 
 const { ROLES: roles, normalizeModules } = require("../utils/modules");
 const { isFirebaseConfigured } = require("../firebase/admin");
@@ -43,15 +57,16 @@ exports.inviteUser = asyncHandler(async (req, res) => {
 	if (await User.findOne({ email, status: { $ne: "suspended" } })) return res.status(409).json({ status: "fail", message: "An account with this email already exists" });
 
 	const token = crypto.randomBytes(32).toString("hex");
-	const invite = await UserInvite.create({ email, fullname, role, tokenHash: hashToken(token), invitedBy: req.user._id, expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
+	const invite = await UserInvite.create({ email, fullname, role, tokenHash: hashToken(token), invitedBy: req.user._id, expiresAt: new Date(Date.now() + INVITE_HOURS * 60 * 60 * 1000) });
 	const placeholderPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
 	await User.findOneAndUpdate({ email }, { fullname, email, role, modules, status: "invited", password: placeholderPassword, invitedBy: req.user._id }, { upsert: true, new: true, setDefaultsOnInsert: true });
 	await recordAudit({ req, action: "invite", resource: "user", resourceId: invite._id, metadata: { email, role } });
 
-	const inviteUrl = `${process.env.FRONTEND_URL || process.env.frontendURL || "http://localhost:5173"}/admin/accept-invite?token=${token}`;
-	await sendAdminInvite({ email, fullname, role, inviteUrl });
+	const inviteUrl = links.invite(token);
+	const mail = await trySend(() => sendInviteEmail({ email, fullname, role, token, invitedBy: req.user.fullname, hours: INVITE_HOURS }));
 	if (process.env.NODE_ENV !== "production") console.log(`Admin invite URL for development: ${inviteUrl}`);
-	res.status(201).json({ status: "success", message: "Invitation created", data: { email, role, expiresAt: invite.expiresAt, ...(process.env.NODE_ENV !== "production" ? { inviteUrl } : {}) } });
+	// The link is returned to the (admin-only) caller only when the email didn't go out, so they can share it.
+	res.status(201).json({ status: "success", message: mail.emailSent ? "Invitation sent" : "Invitation created", data: { email, role, expiresAt: invite.expiresAt, ...mail, ...(!mail.emailSent ? { inviteUrl } : {}) } });
 });
 
 exports.updateUser = asyncHandler(async (req, res) => {
@@ -107,6 +122,16 @@ exports.createUser = asyncHandler(async (req, res) => {
 exports.resetUserPassword = asyncHandler(async (req, res) => {
 	const user = await User.findById(req.params.id);
 	if (!user) return res.status(404).json({ status: "fail", message: "User not found" });
+	if (req.body.sendEmail) {
+		// Email a reset link; the current password keeps working until they use it.
+		const token = crypto.randomBytes(32).toString("hex");
+		user.resetPasswordToken = hashToken(token);
+		user.resetPasswordExpiresAt = new Date(Date.now() + ADMIN_RESET_HOURS * 60 * 60 * 1000);
+		await user.save({ validateBeforeSave: false });
+		const mail = await trySend(() => sendPasswordResetEmail({ email: user.email, fullname: user.fullname, token, minutes: ADMIN_RESET_HOURS * 60, requestedByAdmin: true }));
+		await recordAudit({ req, action: "reset_password", resource: "user", resourceId: user._id, metadata: { method: "email_link", emailSent: mail.emailSent } });
+		return res.status(200).json({ status: "success", ...mail, ...(!mail.emailSent ? { resetUrl: links.reset(token) } : {}) });
+	}
 	if (req.body.password !== undefined && !validPassword(req.body.password)) return res.status(400).json({ status: "fail", message: `Password must be at least ${PASSWORD_MIN} characters with letters and numbers` });
 	const temporaryPassword = req.body.password ? null : generatePassword();
 	user.password = await bcrypt.hash(req.body.password || temporaryPassword, 12);
@@ -124,9 +149,9 @@ exports.resendInvite = asyncHandler(async (req, res) => {
 	if (!user || user.status !== "invited") return res.status(404).json({ status: "fail", message: "Pending invitation not found" });
 	const token = crypto.randomBytes(32).toString("hex");
 	await UserInvite.updateMany({ email: user.email, acceptedAt: null }, { acceptedAt: new Date() });
-	const invite = await UserInvite.create({ email: user.email, fullname: user.fullname, role: user.role, tokenHash: hashToken(token), invitedBy: req.user._id, expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
+	const invite = await UserInvite.create({ email: user.email, fullname: user.fullname, role: user.role, tokenHash: hashToken(token), invitedBy: req.user._id, expiresAt: new Date(Date.now() + INVITE_HOURS * 60 * 60 * 1000) });
 	await recordAudit({ req, action: "resend_invite", resource: "user", resourceId: user._id });
-	const inviteUrl = `${process.env.FRONTEND_URL || process.env.frontendURL || "http://localhost:5173"}/admin/accept-invite?token=${token}`;
-	await sendAdminInvite({ email: user.email, fullname: user.fullname, role: user.role, inviteUrl });
-	res.status(200).json({ status: "success", data: { expiresAt: invite.expiresAt, ...(process.env.NODE_ENV !== "production" ? { inviteUrl } : {}) } });
+	const inviteUrl = links.invite(token);
+	const mail = await trySend(() => sendInviteEmail({ email: user.email, fullname: user.fullname, role: user.role, token, invitedBy: req.user.fullname, hours: INVITE_HOURS }));
+	res.status(200).json({ status: "success", data: { expiresAt: invite.expiresAt, ...mail, ...(!mail.emailSent ? { inviteUrl } : {}) } });
 });
